@@ -4,6 +4,7 @@
 #include <verilated_vcd_c.h>
 #include "verilated.h"
 #include "Vspi.h"
+#include "spislave.h"
 
 Vspi *pCore;
 VerilatedVcdC *pTrace = NULL;
@@ -40,6 +41,10 @@ void reset() {
 }
 
 void handle(Vspi *pCore) {
+    int ret = spislave_handle();
+    if (ret>=0) {
+        printf("miso: %02x ", (uint8_t)ret);
+    }
     tick();
 }
 
@@ -53,6 +58,17 @@ void write_reg(Vspi *pCore, uint8_t a, uint8_t d) {
     pCore->i_addr = 0;
     pCore->i_cs = 0;
     pCore->i_we = 0;
+}
+
+int read_reg(Vspi *pCore, uint8_t a) {
+    pCore->i_dat = 0;
+    pCore->i_addr = a;
+    pCore->i_cs = 1;
+    pCore->i_we = 0;
+    tick();
+    pCore->i_addr = 0;
+    pCore->i_cs = 0;
+    return pCore->o_dat;
 }
 
 int main(int argc, char *argv[]) {
@@ -72,11 +88,17 @@ int main(int argc, char *argv[]) {
         tick();
     }
 
+    spislave_init(&pCore->o_sck, &pCore->i_miso, &pCore->o_mosi, &pCore->o_ss);
+    spislave_set_miso(0x81);
     write_reg(pCore, 0, 1);
-    write_reg(pCore, 1, 123);
+    write_reg(pCore, 1, 0x18);
 
     while( !Verilated::gotFinish()) {
         handle(pCore);
+        if((read_reg(pCore, 0) & 0x80) == 0) {
+            printf("mosi: %02x\n", read_reg(pCore, 1));
+            break;
+        }
         if(tickcount > 10000*ts) {
             break;
         }

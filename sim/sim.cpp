@@ -43,7 +43,7 @@ void reset() {
 void handle(Vspi *pCore) {
     int ret = spislave_handle();
     if (ret>=0) {
-        printf("miso: %02x ", (uint8_t)ret);
+        printf("mosi: %02x\n", (uint8_t)ret);
     }
     tick();
 }
@@ -89,14 +89,15 @@ int main(int argc, char *argv[]) {
     }
 
     spislave_init(&pCore->o_sck, &pCore->i_miso, &pCore->o_mosi, &pCore->o_ss);
-    spislave_set_miso(0x81);
+    spislave_set_miso(0xa5);
     write_reg(pCore, 0, 1);
-    write_reg(pCore, 1, 0x18);
+    write_reg(pCore, 1, 0x5a);
 
     while( !Verilated::gotFinish()) {
         handle(pCore);
         if((read_reg(pCore, 0) & 0x80) == 0) {
-            printf("mosi: %02x\n", read_reg(pCore, 1));
+            printf("miso: %02x\n", read_reg(pCore, 1));
+            write_reg(pCore, 0, 0);
             break;
         }
         if(tickcount > 10000*ts) {

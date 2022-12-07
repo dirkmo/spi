@@ -19,6 +19,8 @@ void spislave_init(uint8_t *_sck, uint8_t *_miso, uint8_t *_mosi, uint8_t *_ss) 
     ss = _ss;
 }
 
+// Mode 0: Data sampled on rising edge and shifted out on the falling edge
+
 int spislave_handle() {
     static uint8_t old_sck = -1;
     static uint8_t mosi_dat;

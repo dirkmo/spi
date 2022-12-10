@@ -31,11 +31,11 @@ int spislave_handle() {
     bool negedge = (old_sck == 1) && (*sck == 0);
     int ret = -1;
     if (*ss) {
-        if (old_ss == 0) {
-            miso_dat = v_miso_data.front();
-            v_miso_data.pop();
-        }
         if (posedge) {
+            if (bitidx == 0) {
+                miso_dat = v_miso_data.front();
+                v_miso_data.pop();
+            }
             mosi_dat = (*mosi | (mosi_dat << 1)) & 0xff;
             if (bitidx == 7) {
                 ret = mosi_dat;
@@ -43,9 +43,6 @@ int spislave_handle() {
         }
         if (negedge) {
             miso_dat = (miso_dat << 1) & 0xff;
-            if (bitidx == 7) {
-                ret = miso_dat;
-            }
             bitidx = (bitidx + 1) % 8;
         }
         *miso = (miso_dat>>7) & 1;

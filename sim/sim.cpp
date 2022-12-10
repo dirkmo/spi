@@ -6,6 +6,8 @@
 #include "Vspi.h"
 #include "spislave.h"
 
+#define LOG(...) {printf("%llu: ", tickcount); printf(__VA_ARGS__); }
+
 Vspi *pCore;
 VerilatedVcdC *pTrace = NULL;
 uint64_t tickcount = 0;
@@ -34,6 +36,14 @@ void tick(int t = 3) {
     }
 }
 
+void halftick() {
+    pCore->i_clk = !pCore->i_clk;
+    pCore->eval();
+    if(pTrace) pTrace->dump(static_cast<vluint64_t>(tickcount));
+    tickcount += ts / 2;
+}
+
+
 void reset() {
     pCore->i_reset = 1;
     tick();
@@ -43,9 +53,8 @@ void reset() {
 void handle(Vspi *pCore) {
     int ret = spislave_handle();
     if (ret>=0) {
-        printf("mosi: %02x\n", (uint8_t)ret);
+        LOG("mosi: %02x\n", (uint8_t)ret);
     }
-    tick();
 }
 
 void write_reg(Vspi *pCore, uint8_t a, uint8_t d) {
@@ -88,22 +97,39 @@ int main(int argc, char *argv[]) {
         tick();
     }
 
-    spislave_init(&pCore->o_sck, &pCore->i_miso, &pCore->o_mosi, &pCore->o_ss);
-    spislave_set_miso(0xa5);
-    write_reg(pCore, 0, 1);
-    write_reg(pCore, 1, 0x5a);
+    uint8_t mosi_data[] = {0x11, 0x22, 0x33, 0x44};
+    uint8_t miso_data[] = {0xaa, 0xbb, 0xcc, 0xdd};
+    uint8_t idx = 0;
 
-    while( !Verilated::gotFinish()) {
+    spislave_init(&pCore->o_sck, &pCore->i_miso, &pCore->o_mosi, &pCore->o_ss);
+    for (int i = 0; i < sizeof(miso_data); i++) {
+        spislave_set_miso(miso_data[i]);
+    }
+
+    write_reg(pCore, 0, 1);
+    write_reg(pCore, 1, mosi_data[idx]);
+
+    idx++;
+    while( !Verilated::gotFinish() ) {
         handle(pCore);
-        if((read_reg(pCore, 0) & 0x80) == 0) {
-            printf("miso: %02x\n", read_reg(pCore, 1));
-            write_reg(pCore, 0, 0);
-            break;
+        if(pCore->o_irq) {
+            // printf("miso: %02x\n", read_reg(pCore, 1));
+            tick(); tick();
+            if (idx < sizeof(mosi_data)) {
+                write_reg(pCore, 1, mosi_data[idx]);
+                idx++;
+            } else {
+                write_reg(pCore, 0, 0);
+                break;
+            }
         }
+        tick();
         if(tickcount > 10000*ts) {
             break;
         }
     }
+
+    tick(); tick();
 
     pCore->final();
     delete pCore;

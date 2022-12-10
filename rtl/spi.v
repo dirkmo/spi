@@ -11,7 +11,9 @@ module spi(
     input i_miso,
     output o_mosi,
     output o_sck,
-    output reg o_ss
+    output reg o_ss,
+
+    output o_irq
 );
 
 parameter DIV = 1;
@@ -19,7 +21,7 @@ parameter DIV = 1;
 reg r_mosi;
 
 // rx/tx data
-reg [7:0] r_data = 8'h81;
+reg [7:0] r_data;
 
 wire w_start_tx = i_cs && i_we && (i_addr == 1'b1); // write to tx-register
 
@@ -27,7 +29,8 @@ wire w_start_tx = i_cs && i_we && (i_addr == 1'b1); // write to tx-register
 localparam
     FIRST_EDGE = 0,
     LAST_EDGE = 7,
-    IDLE = 8;
+    IRQ = 8,
+    IDLE = 9;
 reg [3:0] r_state; // current state
 
 
@@ -39,13 +42,8 @@ always @(posedge i_clk)
     else
         counter <= counter + 1;
 
-reg r_cv;
-always @(posedge i_clk)
-    r_cv <= counter[DIV];
 
-wire counter_pe = ~r_cv && counter[DIV];
-wire counter_ne = r_cv && ~counter[DIV];
-
+wire tick = &counter;
 
 // address map
 // 0: ctl/status reg
@@ -76,13 +74,16 @@ always @(posedge i_clk) begin
             r_data <= i_dat;
             r_mosi <= i_dat[7];
         end
-        default: if (counter_ne) begin
-                r_mosi <= r_data[7];
-            end else if (counter_pe) begin
-                // miso sample on posedgde
-                r_data <= {r_data[6:0], i_miso};
-                r_state <= r_state + 1;
-            end
+        default: if (tick) begin
+            r_mosi <= r_data[7];
+            // miso sample on posedgde
+            r_data <= {r_data[6:0], i_miso};
+            r_state <= r_state + 1;
+        end
+        IRQ: begin
+            $display("miso: %x", r_data);
+            r_state <= IDLE;
+        end
     endcase
     if (i_reset)
         r_state <= IDLE;
@@ -91,8 +92,9 @@ end
 
 assign o_dat = i_addr ? r_data : w_status;
 
-assign o_mosi = o_ss ? r_mosi : 0;
-assign o_sck = counter[DIV];
+assign o_mosi = o_ss && (r_state < 8) ? r_data[7] : 0;
+assign o_sck = (r_state < 8) ? counter[DIV] : 1'b0;
 
+assign o_irq = (r_state == IRQ);
 
 endmodule

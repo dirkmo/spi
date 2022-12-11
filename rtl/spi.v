@@ -18,8 +18,6 @@ module spi(
 
 parameter DIV = 1;
 
-reg r_mosi;
-
 // rx/tx data
 reg [7:0] r_data;
 
@@ -72,10 +70,8 @@ always @(posedge i_clk) begin
         IDLE: if (w_start_tx) begin
             r_state <= FIRST_EDGE;
             r_data <= i_dat;
-            r_mosi <= i_dat[7];
         end
         default: if (tick) begin
-            r_mosi <= r_data[7];
             // miso sample on posedgde
             r_data <= {r_data[6:0], i_miso};
             r_state <= r_state + 1;
@@ -92,7 +88,7 @@ end
 
 assign o_dat = i_addr ? r_data : w_status;
 
-assign o_mosi = o_ss && (r_state < 8) ? r_data[7] : 0;
+assign o_mosi = (r_state < 8) ? r_data[7] : 0;
 assign o_sck = (r_state < 8) ? counter[DIV] : 1'b0;
 
 assign o_irq = (r_state == IRQ);

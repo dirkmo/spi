@@ -10,7 +10,7 @@ static uint8_t *miso;
 static uint8_t *mosi;
 static uint8_t *ss;
 
-queue<uint8_t> v_miso_data;
+static queue<uint8_t> v_miso_data;
 
 void spislave_init(uint8_t *_sck, uint8_t *_miso, uint8_t *_mosi, uint8_t *_ss) {
     sck = _sck;
@@ -33,8 +33,11 @@ int spislave_handle() {
     if (*ss) {
         if (posedge) {
             if (bitidx == 0) {
-                miso_dat = v_miso_data.front();
-                v_miso_data.pop();
+                miso_dat = 0;
+                if (v_miso_data.size() > 0) {
+                    miso_dat = v_miso_data.front();
+                    v_miso_data.pop();
+                }
             }
             mosi_dat = (*mosi | (mosi_dat << 1)) & 0xff;
             if (bitidx == 7) {
@@ -46,6 +49,7 @@ int spislave_handle() {
             bitidx = (bitidx + 1) % 8;
         }
         *miso = (miso_dat>>7) & 1;
+        // printf("bit %d\n",*miso);
     } else {
         bitidx = 0;
     }

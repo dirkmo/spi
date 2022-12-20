@@ -77,7 +77,7 @@ always @(posedge i_clk) begin
             r_state <= r_state + 1;
         end
         IRQ: begin
-            $display("miso: %x", r_data);
+            // $display("miso: %x", r_data);
             r_state <= IDLE;
         end
     endcase

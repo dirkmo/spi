@@ -16,8 +16,6 @@ module spi(
     output o_irq
 );
 
-parameter DIV = 1;
-
 // rx/tx data
 reg [7:0] r_data;
 
@@ -33,19 +31,21 @@ reg [3:0] r_state; // current state
 
 
 // counter to divide i_clk
-reg [DIV:0] counter;
+reg [7:0] counter;
+wire [7:0] counter_next = counter + 1;
 always @(posedge i_clk)
     if (r_state == IDLE)
         counter <= 0;
     else
-        counter <= counter + 1;
+        counter <= counter_next;
 
-
-wire tick = &counter;
+reg [2:0] r_div;
+wire tick = counter[r_div] && ~counter_next[r_div] && (r_state!=IDLE);
 
 // address map
 // 0: ctl/status reg
 //    bit #0: ss
+//    bit #1-3: sck divider
 //    bit #7: transmission active (read only)
 // 1: rx/tx reg
 
@@ -56,6 +56,7 @@ begin
     if (i_cs && i_we) begin
         if (i_addr == 1'b0) begin
             o_ss <= i_dat[0];
+            r_div <= i_dat[3:1];
         end
     end
     if (i_reset) begin
@@ -89,7 +90,7 @@ end
 assign o_dat = i_addr ? r_data : w_status;
 
 assign o_mosi = (r_state < 8) ? r_data[7] : 0;
-assign o_sck = (r_state < 8) ? counter[DIV] : 1'b0;
+assign o_sck = (r_state < 8) ? counter[r_div] : 1'b0;
 
 assign o_irq = (r_state == IRQ);
 
